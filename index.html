@@ -121,7 +121,8 @@ const $ = id => document.getElementById(id);
 let imgB64 = null, imgType = 'image/jpeg', empleados = [];
 
 /* ---------- config ---------- */
-const savedUrl = localStorage.getItem('fichafoto_url') || '';
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbzkg_llF8fxiAR2IxpSllUPEfr71EFbCWJomwu8XIMvUBemd42B7jmT3tEfGDq62ZY-RA/exec';
+const savedUrl = localStorage.getItem('fichafoto_url') || DEFAULT_URL;
 $('apiUrl').value = savedUrl;
 if (savedUrl) showFoto();
 
@@ -161,7 +162,7 @@ $('foto').onchange = e => {
 
 /* ---------- llamadas al Apps Script ---------- */
 async function api(body){
-  const res = await fetch(localStorage.getItem('fichafoto_url'), {
+  const res = await fetch(localStorage.getItem('fichafoto_url') || DEFAULT_URL, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'}, // evita preflight CORS
     body: JSON.stringify(body)
