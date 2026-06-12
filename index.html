@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#0b3d33">
+<title>FichaFoto — Hoja a Sheets</title>
+<style>
+  :root{
+    --bg:#0e1513; --panel:#16211e; --panel2:#1d2b27; --line:#2a3d37;
+    --ink:#e8f2ee; --dim:#8fa8a0; --teal:#19b48a; --teal-dark:#0e6655;
+    --warn:#e8b03c; --err:#e0604f; --ok:#2ecc8f;
+    --mono:'SF Mono',ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+  header{padding:18px 16px 12px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+  header h1{font-size:18px;letter-spacing:.5px}
+  header h1 b{color:var(--teal)}
+  header span{font-size:12px;color:var(--dim)}
+  main{padding:16px;max-width:1100px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:12px}
+  label{display:block;font-size:13px;color:var(--dim);margin:10px 0 4px}
+  input[type=text],input[type=date],input[type=url]{
+    width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    color:var(--ink);padding:10px 12px;font-size:16px}
+  input:focus{outline:2px solid var(--teal);outline-offset:-1px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    background:var(--teal);color:#06241c;border:0;border-radius:10px;padding:14px;
+    font-size:16px;font-weight:700;cursor:pointer;margin-top:12px}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.ghost{background:transparent;color:var(--teal);border:1px solid var(--teal)}
+  .btn.small{width:auto;padding:8px 14px;font-size:13px;margin-top:0}
+  .hidden{display:none !important}
+  #preview{width:100%;border-radius:10px;border:1px solid var(--line);margin-top:12px;max-height:340px;object-fit:contain;background:#000}
+  .status{margin-top:12px;padding:10px 12px;border-radius:8px;font-size:14px}
+  .status.err{background:rgba(224,96,79,.12);color:var(--err);border:1px solid rgba(224,96,79,.4)}
+  .status.ok{background:rgba(46,204,143,.1);color:var(--ok);border:1px solid rgba(46,204,143,.35)}
+  .status.busy{background:rgba(25,180,138,.08);color:var(--teal);border:1px solid var(--line)}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--teal);border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* Tabla de verificación */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;font-family:var(--mono);font-size:13px;min-width:980px;width:100%}
+  th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:0;text-align:center}
+  th{background:var(--teal-dark);color:#fff;font-size:11px;padding:7px 4px;position:sticky;top:0}
+  th.day{background:#0a4f42}
+  td input{width:52px;background:transparent;border:0;color:var(--ink);text-align:center;padding:8px 2px;font:inherit}
+  td input:focus{outline:2px solid var(--teal);outline-offset:-2px;background:var(--panel2)}
+  td.name{position:sticky;left:0;background:var(--panel2);z-index:2;min-width:150px}
+  th.name{position:sticky;left:0;z-index:3}
+  td.name input{width:148px;text-align:left;padding-left:8px;font-family:inherit;font-size:13px}
+  td.tot{color:var(--teal);font-weight:700;padding:8px 6px;background:var(--panel2)}
+  td input.dudosa{background:rgba(232,176,60,.18);color:var(--warn)}
+  tr.zebra td{background:rgba(255,255,255,.018)}
+  td.del{padding:0}
+  td.del button{background:none;border:0;color:var(--err);font-size:15px;padding:8px 10px;cursor:pointer}
+  .legend{font-size:12px;color:var(--dim);margin:10px 2px}
+  .legend b{color:var(--warn)}
+  .rowbtns{display:flex;gap:10px;margin-top:12px}
+  .rowbtns .btn{margin-top:0}
+  footer{padding:20px;text-align:center;font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ficha<b>Foto</b></h1>
+  <span>hoja de papel → Google Sheets</span>
+</header>
+<main>
+
+  <!-- PASO 0: CONFIG -->
+  <section class="card" id="cardConfig">
+    <h2>Configuración</h2>
+    <label>URL del Apps Script (acaba en /exec)</label>
+    <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <button class="btn ghost" id="btnSaveCfg">Guardar configuración</button>
+  </section>
+
+  <!-- PASO 1: FOTO -->
+  <section class="card hidden" id="cardFoto">
+    <h2>1 · Semana y foto</h2>
+    <label>Lunes de la semana</label>
+    <input type="date" id="semana">
+    <label>Foto de la hoja (entera, plana y con luz)</label>
+    <input type="file" id="foto" accept="image/*" capture="environment">
+    <img id="preview" class="hidden" alt="">
+    <button class="btn" id="btnLeer" disabled>Leer hoja con IA</button>
+    <div id="stFoto"></div>
+  </section>
+
+  <!-- PASO 2: VERIFICACIÓN -->
+  <section class="card hidden" id="cardVerif">
+    <h2>2 · Verifica y corrige</h2>
+    <p class="legend">Vacío = no trabajó · número = horas · SI = tal cual · <b>amarillo</b> = la IA no estaba segura (marcó "?"), revísalo</p>
+    <div class="tablewrap"><table id="tabla"></table></div>
+    <div class="rowbtns">
+      <button class="btn ghost small" id="btnAddRow">+ Añadir empleado</button>
+      <button class="btn ghost small" id="btnRetry">↺ Otra foto</button>
+    </div>
+    <button class="btn" id="btnGuardar">Guardar en Sheets</button>
+    <div id="stVerif"></div>
+  </section>
+
+  <!-- PASO 3: OK -->
+  <section class="card hidden" id="cardOk">
+    <h2>Guardado</h2>
+    <div class="status ok" id="okMsg"></div>
+    <button class="btn" id="btnOtra">Procesar otra semana</button>
+  </section>
+
+</main>
+<footer>FichaFoto · solo se envía la foto a tu Apps Script, la API key nunca sale de Google</footer>
+
+<script>
+const DAYS = ['L','M','X','J','V','S','D'];
+const DAY_NAMES = {L:'LUN',M:'MAR',X:'MIÉ',J:'JUE',V:'VIE',S:'SÁB',D:'DOM'};
+const $ = id => document.getElementById(id);
+let imgB64 = null, imgType = 'image/jpeg', empleados = [];
+
+/* ---------- config ---------- */
+const savedUrl = localStorage.getItem('fichafoto_url') || '';
+$('apiUrl').value = savedUrl;
+if (savedUrl) showFoto();
+
+$('btnSaveCfg').onclick = () => {
+  const u = $('apiUrl').value.trim();
+  if (!u.startsWith('https://script.google.com/')) { alert('La URL debe ser de script.google.com y acabar en /exec'); return; }
+  localStorage.setItem('fichafoto_url', u);
+  showFoto();
+};
+function showFoto(){
+  $('cardConfig').classList.add('hidden');
+  $('cardFoto').classList.remove('hidden');
+  // lunes de esta semana por defecto
+  const d = new Date(); const day = (d.getDay()+6)%7; d.setDate(d.getDate()-day);
+  $('semana').value = d.toISOString().slice(0,10);
+}
+
+/* ---------- foto + compresión ---------- */
+$('foto').onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 1568;
+    let w = img.width, h = img.height;
+    if (Math.max(w,h) > MAX){ const s = MAX/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    const dataUrl = c.toDataURL('image/jpeg',0.85);
+    imgB64 = dataUrl.split(',')[1]; imgType='image/jpeg';
+    $('preview').src = dataUrl; $('preview').classList.remove('hidden');
+    $('btnLeer').disabled = false;
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+/* ---------- llamadas al Apps Script ---------- */
+async function api(body){
+  const res = await fetch(localStorage.getItem('fichafoto_url'), {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, // evita preflight CORS
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+/* ---------- extracción ---------- */
+$('btnLeer').onclick = async () => {
+  if (!imgB64) return;
+  $('btnLeer').disabled = true;
+  setStatus('stFoto','busy','<span class="spinner"></span>Leyendo la hoja con IA… (15-40 s)');
+  try{
+    const r = await api({action:'extract', image:imgB64, mediaType:imgType});
+    if (!r.ok) throw new Error(r.error || 'Error desconocido');
+    empleados = r.data.empleados.map(normaliza);
+    if (r.data.fecha) inferirSemana(r.data.fecha);
+    renderTabla();
+    setStatus('stFoto','ok','Leídos ' + empleados.length + ' empleados. Revisa la tabla.');
+    $('cardVerif').classList.remove('hidden');
+    $('cardVerif').scrollIntoView({behavior:'smooth'});
+  }catch(err){
+    setStatus('stFoto','err','Error: ' + err.message);
+  }
+  $('btnLeer').disabled = false;
+};
+
+function normaliza(e){
+  const dias = {};
+  DAYS.forEach(k => {
+    const d = (e.dias && e.dias[k]) || {};
+    dias[k] = { d: limpia(d.d), n: limpia(d.n) };
+  });
+  return { nombre: (e.nombre||'').trim(), horas: limpia(e.horas), dias };
+}
+function limpia(v){
+  if (v === null || v === undefined || v === '' || v === '—' || v === '-') return '';
+  if (typeof v === 'number') return v;
+  const s = String(v).trim().toUpperCase();
+  if (s === 'SI' || s === 'SÍ') return 'SI';
+  if (s === '?') return '?';
+  const n = parseFloat(s.replace(',','.'));
+  return isNaN(n) ? s : n;
+}
+function inferirSemana(fechaTxt){
+  // "1/06" → ajusta el date-picker al lunes de esa semana del año actual
+  const m = fechaTxt.match(/(\d{1,2})\s*[\/\-]\s*(\d{1,2})/);
+  if (!m) return;
+  const d = new Date(new Date().getFullYear(), parseInt(m[2],10)-1, parseInt(m[1],10));
+  if (isNaN(d)) return;
+  const off = (d.getDay()+6)%7; d.setDate(d.getDate()-off);
+  $('semana').value = d.toISOString().slice(0,10);
+}
+
+/* ---------- tabla editable ---------- */
+function renderTabla(){
+  const t = $('tabla');
+  let h = '<thead><tr><th class="name">NOMBRE</th><th>HORAS</th>';
+  DAYS.forEach(k => h += '<th class="day" colspan="2">'+DAY_NAMES[k]+'</th>');
+  h += '<th>T.DÍA</th><th>T.NOC</th><th></th></tr><tr><th class="name"></th><th></th>';
+  DAYS.forEach(()=> h += '<th>D</th><th>N</th>');
+  h += '<th></th><th></th><th></th></tr></thead><tbody>';
+  empleados.forEach((e,i)=>{
+    h += '<tr class="'+(i%2?'zebra':'')+'">';
+    h += '<td class="name"><input data-i="'+i+'" data-f="nombre" value="'+esc(e.nombre)+'"></td>';
+    h += '<td><input data-i="'+i+'" data-f="horas" value="'+esc(e.horas)+'"></td>';
+    DAYS.forEach(k=>{
+      h += celda(i,k,'d',e.dias[k].d) + celda(i,k,'n',e.dias[k].n);
+    });
+    const tt = totales(e);
+    h += '<td class="tot" id="td'+i+'">'+tt.d+'</td><td class="tot" id="tn'+i+'">'+tt.n+'</td>';
+    h += '<td class="del"><button data-del="'+i+'" title="Eliminar fila">✕</button></td></tr>';
+  });
+  t.innerHTML = h + '</tbody>';
+
+  t.querySelectorAll('input').forEach(inp=>{
+    inp.oninput = ev => {
+      const i=+inp.dataset.i, f=inp.dataset.f;
+      const v = limpia(inp.value);
+      if (f==='nombre') empleados[i].nombre = inp.value;
+      else if (f==='horas') empleados[i].horas = v;
+      else { empleados[i].dias[inp.dataset.k][f] = v; inp.classList.toggle('dudosa', v==='?'); }
+      const tt = totales(empleados[i]);
+      $('td'+i).textContent = tt.d; $('tn'+i).textContent = tt.n;
+    };
+  });
+  t.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick = ()=>{ empleados.splice(+b.dataset.del,1); renderTabla(); };
+  });
+}
+function celda(i,k,f,v){
+  return '<td><input data-i="'+i+'" data-k="'+k+'" data-f="'+f+'" class="'+(v==='?'?'dudosa':'')+'" value="'+esc(v)+'"></td>';
+}
+function totales(e){
+  let d=0,n=0;
+  DAYS.forEach(k=>{
+    if (typeof e.dias[k].d==='number') d+=e.dias[k].d;
+    if (typeof e.dias[k].n==='number') n+=e.dias[k].n;
+  });
+  return {d:Math.round(d*10)/10, n:Math.round(n*10)/10};
+}
+function esc(v){ return String(v==null?'':v).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+$('btnAddRow').onclick = ()=>{
+  const dias={}; DAYS.forEach(k=>dias[k]={d:'',n:''});
+  empleados.push({nombre:'',horas:'',dias});
+  renderTabla();
+};
+$('btnRetry').onclick = ()=>{
+  $('cardVerif').classList.add('hidden');
+  $('foto').value=''; $('preview').classList.add('hidden'); $('btnLeer').disabled=true;
+  setStatus('stFoto','',''); window.scrollTo({top:0,behavior:'smooth'});
+};
+
+/* ---------- guardado ---------- */
+$('btnGuardar').onclick = async ()=>{
+  const dudosas = document.querySelectorAll('input.dudosa').length;
+  if (dudosas && !confirm('Hay '+dudosas+' celdas marcadas con "?" sin revisar. ¿Guardar igualmente?')) return;
+  const rows = empleados.filter(e=>e.nombre.trim());
+  if (!rows.length){ setStatus('stVerif','err','No hay filas con nombre'); return; }
+  $('btnGuardar').disabled = true;
+  setStatus('stVerif','busy','<span class="spinner"></span>Guardando…');
+  try{
+    const semana = $('semana').value || '';
+    const r = await api({action:'save', semana: formatoSemana(semana), rows});
+    if (!r.ok) throw new Error(r.error || 'Error desconocido');
+    $('cardFoto').classList.add('hidden');
+    $('cardVerif').classList.add('hidden');
+    $('cardOk').classList.remove('hidden');
+    $('okMsg').textContent = r.saved + ' empleados guardados en la hoja FICHAJES (semana ' + formatoSemana(semana) + ')';
+    window.scrollTo({top:0});
+  }catch(err){
+    setStatus('stVerif','err','Error: ' + err.message);
+  }
+  $('btnGuardar').disabled = false;
+};
+function formatoSemana(iso){
+  if (!iso) return '';
+  const p = iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0];
+}
+$('btnOtra').onclick = ()=>{
+  empleados=[]; imgB64=null;
+  $('cardOk').classList.add('hidden');
+  $('btnRetry').click();
+  $('cardFoto').classList.remove('hidden');
+};
+
+function setStatus(id, cls, html){
+  $(id).innerHTML = html ? '<div class="status '+cls+'">'+html+'</div>' : '';
+}
+</script>
+</body>
+</html>
